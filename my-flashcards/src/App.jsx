@@ -24,7 +24,7 @@ const initialVocabulary = [
   { id: 21, wrong: "岐路", correct: "歧路" },
   { id: 22, wrong: "鑲鉗", correct: "鑲嵌" },
   { id: 23, wrong: "堪察", correct: "勘察" },
-  { id: 24, wrong: "嚴峻", correct: "嚴峻" }, 
+  { id: 24, wrong: "嚴竣", correct: "嚴峻" }, 
   { id: 25, wrong: "完竢", correct: "完竣" },
   { id: 26, wrong: "膺品", correct: "贗品" },
   { id: 27, wrong: "拆扣", correct: "折扣" },
