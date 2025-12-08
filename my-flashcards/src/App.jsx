@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { BookOpen, Check, X, RotateCw, BarChart2, RefreshCw, Trophy, AlertTriangle, List, Layers, Bookmark, Download } from 'lucide-react';
+import { BookOpen, Check, X, RotateCw, BarChart2, RefreshCw, Trophy, AlertTriangle, List, Layers, Bookmark, Download, Trash2 } from 'lucide-react';
 
-// Data extracted from "參考資料_字詞辨正.pdf"
+const STORAGE_KEY = 'chinese-flashcards-data-v1';
+const STREAK_KEY = 'chinese-flashcards-streak-v1';
+
+// Data extracted from "參考資料_字詞辨正.pdf" with user corrections applied
 const initialVocabulary = [
   { id: 1, wrong: "畢挺", correct: "筆挺" },
   { id: 2, wrong: "豐采", correct: "風采" },
@@ -187,26 +190,73 @@ const selectRandomCard = (activeCards, currentCardId) => {
 
 export default function ChineseFlashcards() {
   const [view, setView] = useState('flashcards'); // 'flashcards' | 'saved'
+  
+  // Initialize state from LocalStorage or Default
   const [cards, setCards] = useState(() => {
+    try {
+      const savedData = localStorage.getItem(STORAGE_KEY);
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        // MERGE LOGIC:
+        // We use the 'initialVocabulary' from the code (to get the latest corrected text)
+        // But we apply the 'weight', 'learned', 'saved' status from localStorage.
+        return initialVocabulary.map(initCard => {
+          const savedCard = parsedData.find(sc => sc.id === initCard.id);
+          if (savedCard) {
+            return {
+              ...initCard, // Use text from code (contains user fixes)
+              weight: savedCard.weight,
+              sessionCount: savedCard.sessionCount,
+              learned: savedCard.learned,
+              saved: savedCard.saved
+            };
+          }
+          // If a new card was added to code but not in storage
+          return { ...initCard, weight: 10, sessionCount: 0, learned: false, saved: false };
+        });
+      }
+    } catch (error) {
+      console.error("Failed to load vocabulary from storage", error);
+    }
+    // Fallback if no storage
     return initialVocabulary.map(card => ({ 
       ...card, 
       weight: 10, 
       sessionCount: 0, 
       learned: false,
-      saved: false // New property for "Review List"
+      saved: false 
     }));
   });
   
   const [currentCard, setCurrentCard] = useState(null);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [streak, setStreak] = useState(0);
+  
+  // Initialize streak from storage
+  const [streak, setStreak] = useState(() => {
+    try {
+      const savedStreak = localStorage.getItem(STREAK_KEY);
+      return savedStreak ? parseInt(savedStreak, 10) : 0;
+    } catch (e) {
+      return 0;
+    }
+  });
+  
   const [finished, setFinished] = useState(false);
 
+  // SAVE TO STORAGE whenever 'cards' or 'streak' changes
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
+    localStorage.setItem(STREAK_KEY, streak.toString());
+  }, [cards, streak]);
+
+  // Initial Card Selection
   useEffect(() => {
     if (!currentCard && !finished) {
       const activeCards = cards.filter(c => !c.learned);
       if (activeCards.length > 0) {
         setCurrentCard(selectRandomCard(activeCards, null));
+      } else {
+        setFinished(true); // If all learned on load
       }
     }
   }, []);
@@ -256,8 +306,8 @@ export default function ChineseFlashcards() {
     }
   };
 
+  // Reset Session (Clears learned status but keeps saved list)
   const restartSession = () => {
-    // Keeps the 'saved' status but resets learning status
     const resetCards = cards.map(c => ({ ...c, learned: false, weight: 10 }));
     setCards(resetCards);
     setFinished(false);
@@ -266,20 +316,37 @@ export default function ChineseFlashcards() {
     setIsFlipped(false);
   };
 
+  // NEW: Hard Reset (Clears Storage)
+  const clearStorage = () => {
+    if (confirm("Are you sure? This will delete all your progress and saved words.")) {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STREAK_KEY);
+      window.location.reload();
+    }
+  };
+
+  // REMOVE ITEM FROM SAVED LIST (Only un-flags 'saved', doesn't mark as learned)
+  const removeSavedItem = (id) => {
+    const updatedCards = cards.map(card => {
+      if (card.id === id) {
+        return { ...card, saved: false };
+      }
+      return card;
+    });
+    setCards(updatedCards);
+  };
+
   // --- DOWNLOAD FUNCTION ---
   const downloadMistakes = () => {
     const savedList = cards.filter(c => c.saved);
     if (savedList.length === 0) return;
 
-    // Create the content string
     const fileContent = savedList.map(card => `${card.wrong} ${card.correct}`).join('\n');
-    
-    // Create a blob and link to trigger download
     const element = document.createElement("a");
     const file = new Blob([fileContent], {type: 'text/plain'});
     element.href = URL.createObjectURL(file);
     element.download = "gorevise.txt";
-    document.body.appendChild(element); // Required for this to work in FireFox
+    document.body.appendChild(element); 
     element.click();
     document.body.removeChild(element);
   };
@@ -297,14 +364,23 @@ export default function ChineseFlashcards() {
             <h1 className="text-2xl font-bold text-stone-800">Review List</h1>
           </div>
           
-          <button 
-            onClick={downloadMistakes}
-            disabled={savedList.length === 0}
-            className="flex items-center gap-2 bg-stone-800 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            Download .txt
-          </button>
+          <div className="flex gap-2">
+            <button 
+                onClick={clearStorage}
+                className="flex items-center gap-2 bg-stone-200 text-stone-600 px-3 py-2 rounded-lg text-xs font-bold hover:bg-stone-300 transition-colors"
+                title="Reset All Progress"
+            >
+                <Trash2 className="w-4 h-4" />
+            </button>
+            <button 
+                onClick={downloadMistakes}
+                disabled={savedList.length === 0}
+                className="flex items-center gap-2 bg-stone-800 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+                <Download className="w-4 h-4" />
+                Download
+            </button>
+          </div>
         </header>
 
         <div className="w-full max-w-md space-y-3">
@@ -315,7 +391,7 @@ export default function ChineseFlashcards() {
             </div>
           ) : (
             savedList.map((card) => (
-              <div key={card.id} className="bg-white p-4 rounded-xl shadow-sm border border-stone-100 flex items-center justify-between">
+              <div key={card.id} className="relative bg-white p-4 rounded-xl shadow-sm border border-stone-100 flex items-center justify-between group">
                 <div className="flex flex-col items-center flex-1 border-r border-stone-100 pr-4">
                   <span className="text-xs text-stone-400 uppercase tracking-widest mb-1">Wrong</span>
                   <span className="text-xl font-medium text-stone-500 line-through decoration-red-300">{card.wrong}</span>
@@ -324,6 +400,15 @@ export default function ChineseFlashcards() {
                   <span className="text-xs text-green-600 uppercase tracking-widest mb-1 font-bold">Correct</span>
                   <span className="text-2xl font-bold text-stone-800">{card.correct}</span>
                 </div>
+                
+                {/* DELETE BUTTON */}
+                <button 
+                    onClick={() => removeSavedItem(card.id)}
+                    className="absolute -top-2 -right-2 bg-stone-200 hover:bg-red-500 hover:text-white text-stone-500 p-1 rounded-full shadow-sm transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                    title="Remove from list"
+                >
+                    <X className="w-4 h-4" />
+                </button>
               </div>
             ))
           )}
