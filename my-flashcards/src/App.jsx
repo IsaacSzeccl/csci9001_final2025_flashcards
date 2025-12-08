@@ -545,7 +545,7 @@ export default function ChineseFlashcards() {
          <div className="flex-1 flex flex-col items-center justify-center text-center w-full max-w-md">
             <div className="bg-white p-10 rounded-3xl shadow-xl w-full border border-amber-100">
               <Trophy className="w-20 h-20 text-yellow-500 mb-6 mx-auto" />
-              <h2 className="text-3xl font-bold text-stone-800 mb-2">恭喜 (Gōngxǐ)!</h2>
+              <h2 className="text-3xl font-bold text-stone-800 mb-2">Congrats!</h2>
               <p className="text-stone-500 mb-8">
                   {isReviewingSaved ? "You've cleared your review list for this section!" : "You've completed all cards in this section."}
               </p>
