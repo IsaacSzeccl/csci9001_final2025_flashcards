@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { BookOpen, Check, X, RotateCw, BarChart2, RefreshCw, Trophy, AlertTriangle } from 'lucide-react';
+import { BookOpen, Check, X, RotateCw, BarChart2, RefreshCw, Trophy, AlertTriangle, List, Layers, Bookmark, Download } from 'lucide-react';
 
 // Data extracted from "參考資料_字詞辨正.pdf"
 const initialVocabulary = [
@@ -7,11 +7,13 @@ const initialVocabulary = [
   { id: 2, wrong: "豐采", correct: "風采" },
   { id: 3, wrong: "煩燥", correct: "煩躁" },
   { id: 4, wrong: "乾躁", correct: "乾燥" },
+  { id: 5, wrong: "眈誤", correct: "耽誤" },
   { id: 6, wrong: "隱若", correct: "隱約" },
   { id: 7, wrong: "手飾", correct: "首飾" },
   { id: 8, wrong: "清淅", correct: "清晰" },
   { id: 9, wrong: "辨論", correct: "辯論" },
   { id: 10, wrong: "浪廢", correct: "浪費" },
+  { id: 11, wrong: "巳經", correct: "已經" },
   { id: 12, wrong: "熟識", correct: "熟悉" },
   { id: 13, wrong: "反醒", correct: "反省" },
   { id: 14, wrong: "零晨", correct: "凌晨" },
@@ -44,9 +46,11 @@ const initialVocabulary = [
   { id: 41, wrong: "婉惜", correct: "惋惜" },
   { id: 42, wrong: "盤倨", correct: "盤踞" },
   { id: 43, wrong: "詳程", correct: "詳情" },
+  { id: 44, wrong: "腐杇", correct: "腐朽" },
   { id: 45, wrong: "服待", correct: "服侍" },
   { id: 46, wrong: "脈胳", correct: "脈絡" },
   { id: 47, wrong: "轄免", correct: "豁免" },
+  { id: 48, wrong: "藉貫", correct: "籍貫" },
   { id: 49, wrong: "陶治", correct: "陶冶" },
   { id: 50, wrong: "熟諗", correct: "熟稔" },
   { id: 51, wrong: "貫輸", correct: "灌輸" },
@@ -75,6 +79,7 @@ const initialVocabulary = [
   { id: 74, wrong: "恐佈", correct: "恐怖" },
   { id: 75, wrong: "切想", correct: "設想" },
   { id: 76, wrong: "食不裹腹", correct: "食不果腹" },
+  { id: 77, wrong: "妄自非薄", correct: "妄自菲薄" },
   { id: 78, wrong: "名列前矛", correct: "名列前茅" },
   { id: 79, wrong: "舉旗不定", correct: "舉棋不定" },
   { id: 80, wrong: "肝腦途地", correct: "肝腦塗地" },
@@ -101,6 +106,7 @@ const initialVocabulary = [
   { id: 101, wrong: "沮擊", correct: "狙擊" },
   { id: 102, wrong: "嘗光", correct: "賞光" },
   { id: 103, wrong: "公孥", correct: "公帑" },
+  { id: 104, wrong: "叼嘮", correct: "叨嘮" },
   { id: 105, wrong: "變掛", correct: "變卦" },
   { id: 106, wrong: "事誼", correct: "事宜" },
   { id: 107, wrong: "符會", correct: "附會" },
@@ -180,12 +186,14 @@ const selectRandomCard = (activeCards, currentCardId) => {
 };
 
 export default function ChineseFlashcards() {
+  const [view, setView] = useState('flashcards'); // 'flashcards' | 'saved'
   const [cards, setCards] = useState(() => {
     return initialVocabulary.map(card => ({ 
       ...card, 
       weight: 10, 
       sessionCount: 0, 
-      learned: false 
+      learned: false,
+      saved: false // New property for "Review List"
     }));
   });
   
@@ -211,9 +219,18 @@ export default function ChineseFlashcards() {
     const updatedCards = cards.map(card => {
       if (card.id === currentCard.id) {
         if (knowsIt) {
+          // If known, remove from deck, but keep in saved list if it was already saved
           return { ...card, learned: true, weight: 0 };
         } else {
-          return { ...card, weight: Math.min(100, card.weight + 20), sessionCount: card.sessionCount + 1 };
+          // If NOT known (Study Again):
+          // 1. Increase weight
+          // 2. Mark as SAVED (add to review list)
+          return { 
+            ...card, 
+            weight: Math.min(100, card.weight + 20), 
+            sessionCount: card.sessionCount + 1,
+            saved: true 
+          };
         }
       }
       return card;
@@ -240,6 +257,7 @@ export default function ChineseFlashcards() {
   };
 
   const restartSession = () => {
+    // Keeps the 'saved' status but resets learning status
     const resetCards = cards.map(c => ({ ...c, learned: false, weight: 10 }));
     setCards(resetCards);
     setFinished(false);
@@ -248,32 +266,96 @@ export default function ChineseFlashcards() {
     setIsFlipped(false);
   };
 
-  if (finished) {
+  // --- DOWNLOAD FUNCTION ---
+  const downloadMistakes = () => {
+    const savedList = cards.filter(c => c.saved);
+    if (savedList.length === 0) return;
+
+    // Create the content string
+    const fileContent = savedList.map(card => `${card.wrong} ${card.correct}`).join('\n');
+    
+    // Create a blob and link to trigger download
+    const element = document.createElement("a");
+    const file = new Blob([fileContent], {type: 'text/plain'});
+    element.href = URL.createObjectURL(file);
+    element.download = "gorevise.txt";
+    document.body.appendChild(element); // Required for this to work in FireFox
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  const activeCount = cards.filter(c => !c.learned).length;
+  const savedList = cards.filter(c => c.saved);
+
+  // --- RENDER SAVED LIST ---
+  if (view === 'saved') {
     return (
-      <div className="min-h-screen bg-amber-50 flex flex-col items-center justify-center p-4 text-center">
-        <div className="bg-white p-10 rounded-3xl shadow-xl max-w-md w-full flex flex-col items-center border border-amber-100">
-          <Trophy className="w-20 h-20 text-yellow-500 mb-6" />
-          <h2 className="text-3xl font-bold text-stone-800 mb-2">恭喜 (Gōngxǐ)!</h2>
-          <p className="text-stone-500 mb-8">You've mastered all the corrections.</p>
+      <div className="min-h-screen bg-amber-50 flex flex-col items-center py-6 px-4 font-sans text-stone-800 pb-24">
+        <header className="w-full max-w-md flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <Bookmark className="w-6 h-6 text-red-600" />
+            <h1 className="text-2xl font-bold text-stone-800">Review List</h1>
+          </div>
           
           <button 
-            onClick={restartSession}
-            className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-full flex items-center gap-2 transition-transform active:scale-95"
+            onClick={downloadMistakes}
+            disabled={savedList.length === 0}
+            className="flex items-center gap-2 bg-stone-800 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            <RefreshCw className="w-5 h-5" />
-            Start Over
+            <Download className="w-4 h-4" />
+            Download .txt
+          </button>
+        </header>
+
+        <div className="w-full max-w-md space-y-3">
+          {savedList.length === 0 ? (
+            <div className="text-center py-10 text-stone-400">
+              <p>No saved words yet.</p>
+              <p className="text-sm mt-2">Click "Study Again" on a card to add it here.</p>
+            </div>
+          ) : (
+            savedList.map((card) => (
+              <div key={card.id} className="bg-white p-4 rounded-xl shadow-sm border border-stone-100 flex items-center justify-between">
+                <div className="flex flex-col items-center flex-1 border-r border-stone-100 pr-4">
+                  <span className="text-xs text-stone-400 uppercase tracking-widest mb-1">Wrong</span>
+                  <span className="text-xl font-medium text-stone-500 line-through decoration-red-300">{card.wrong}</span>
+                </div>
+                <div className="flex flex-col items-center flex-1 pl-4">
+                  <span className="text-xs text-green-600 uppercase tracking-widest mb-1 font-bold">Correct</span>
+                  <span className="text-2xl font-bold text-stone-800">{card.correct}</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Bottom Navigation */}
+        <div className="fixed bottom-0 left-0 w-full bg-white border-t border-stone-200 p-3 flex justify-center gap-8 z-10">
+          <button 
+            onClick={() => setView('flashcards')}
+            className={`flex flex-col items-center gap-1 ${view === 'flashcards' ? 'text-red-600' : 'text-stone-400'}`}
+          >
+            <Layers className="w-6 h-6" />
+            <span className="text-xs font-medium">Flashcards</span>
+          </button>
+          <button 
+            onClick={() => setView('saved')}
+            className={`flex flex-col items-center gap-1 ${view === 'saved' ? 'text-red-600' : 'text-stone-400'}`}
+          >
+            <List className="w-6 h-6" />
+            <span className="text-xs font-medium">Review List</span>
+            {savedList.length > 0 && (
+              <span className="absolute ml-6 mb-4 w-2 h-2 bg-red-500 rounded-full"></span>
+            )}
           </button>
         </div>
       </div>
     );
   }
 
-  if (!currentCard) return <div className="min-h-screen bg-amber-50 flex items-center justify-center text-stone-500">Loading...</div>;
-
-  const activeCount = cards.filter(c => !c.learned).length;
-
+  // --- RENDER FLASHCARDS ---
   return (
-    <div className="min-h-screen bg-amber-50 flex flex-col items-center py-10 px-4 font-sans text-stone-800">
+    <div className="min-h-screen bg-amber-50 flex flex-col items-center py-10 px-4 font-sans text-stone-800 pb-24">
       
       {/* Header */}
       <header className="w-full max-w-md flex justify-between items-center mb-6">
@@ -292,82 +374,115 @@ export default function ChineseFlashcards() {
         </div>
       </header>
 
-      {/* Progress Bar */}
-      <div className="w-full max-w-md bg-stone-200 h-2 rounded-full mb-8 overflow-hidden">
-        <div 
-          className="bg-green-500 h-full transition-all duration-500"
-          style={{ 
-            width: `${((cards.length - activeCount) / cards.length) * 100}%` 
-          }}
-        />
-      </div>
-
-      {/* Card Area */}
-      <div className="perspective-1000 w-full max-w-md h-96 cursor-pointer group" onClick={handleFlip}>
-        <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
-          
-          {/* Front of Card (WRONG) */}
-          <div className="absolute w-full h-full backface-hidden bg-white rounded-3xl shadow-xl flex flex-col items-center justify-center border-2 border-stone-100 p-8 hover:shadow-2xl transition-shadow overflow-hidden">
-            {/* Corner Tag */}
-            <div className="absolute top-6 right-6 flex items-center gap-1 text-red-400 bg-red-50 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">
-                <AlertTriangle className="w-3 h-3" />
-                <span>Incorrect</span>
+      {/* Completion State */}
+      {finished ? (
+         <div className="flex-1 flex flex-col items-center justify-center text-center w-full max-w-md">
+            <div className="bg-white p-10 rounded-3xl shadow-xl w-full border border-amber-100">
+              <Trophy className="w-20 h-20 text-yellow-500 mb-6 mx-auto" />
+              <h2 className="text-3xl font-bold text-stone-800 mb-2">恭喜 (Gōngxǐ)!</h2>
+              <p className="text-stone-500 mb-8">You've mastered all the corrections.</p>
+              <button 
+                onClick={restartSession}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-full flex items-center justify-center gap-2 w-full transition-transform active:scale-95"
+              >
+                <RefreshCw className="w-5 h-5" />
+                Start Over
+              </button>
             </div>
-
-            <div className="text-center">
-                <span className="text-sm text-stone-400 font-semibold tracking-widest uppercase mb-4 block">Identify the Error</span>
-                <h2 className={`${currentCard.wrong.length > 5 ? 'text-3xl' : 'text-6xl'} font-bold text-stone-800 mb-2 leading-tight`}>
-                {currentCard.wrong}
-                </h2>
-            </div>
-            
-            <p className="text-stone-300 text-sm mt-12 animate-pulse absolute bottom-8">Tap to see correct form</p>
+         </div>
+      ) : currentCard ? (
+        <>
+          {/* Progress Bar */}
+          <div className="w-full max-w-md bg-stone-200 h-2 rounded-full mb-8 overflow-hidden">
+            <div 
+              className="bg-green-500 h-full transition-all duration-500"
+              style={{ 
+                width: `${((cards.length - activeCount) / cards.length) * 100}%` 
+              }}
+            />
           </div>
 
-          {/* Back of Card (CORRECT) */}
-          <div className="absolute w-full h-full backface-hidden bg-red-600 rounded-3xl shadow-xl rotate-y-180 flex flex-col items-center justify-center p-8 text-white">
-             
-             {/* Corner Tag */}
-             <div className="absolute top-6 right-6 flex items-center gap-1 text-red-600 bg-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">
-                <Check className="w-3 h-3" />
-                <span>Correct</span>
-            </div>
-
-             <div className="flex flex-col items-center text-center space-y-6 w-full">
-              <div>
-                <span className="text-xs text-red-200 uppercase tracking-widest opacity-80">You saw</span>
-                <p className="text-2xl font-medium text-red-200 line-through decoration-red-300/50 mt-1">{currentCard.wrong}</p>
+          {/* Card Area */}
+          <div className="perspective-1000 w-full max-w-md h-96 cursor-pointer group" onClick={handleFlip}>
+            <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+              
+              {/* Front of Card (WRONG) */}
+              <div className="absolute w-full h-full backface-hidden bg-white rounded-3xl shadow-xl flex flex-col items-center justify-center border-2 border-stone-100 p-8 hover:shadow-2xl transition-shadow overflow-hidden">
+                <div className="absolute top-6 right-6 flex items-center gap-1 text-red-400 bg-red-50 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">
+                    <AlertTriangle className="w-3 h-3" />
+                    <span>Incorrect</span>
+                </div>
+                <div className="text-center">
+                    <span className="text-sm text-stone-400 font-semibold tracking-widest uppercase mb-4 block">Identify the Error</span>
+                    <h2 className={`${currentCard.wrong.length > 5 ? 'text-3xl' : 'text-6xl'} font-bold text-stone-800 mb-2 leading-tight`}>
+                    {currentCard.wrong}
+                    </h2>
+                </div>
+                <p className="text-stone-300 text-sm mt-12 animate-pulse absolute bottom-8">Tap to see correct form</p>
               </div>
-              
-              <div className="w-16 h-1 bg-red-400 rounded-full"></div>
-              
-              <div>
-                <span className="text-xs text-red-200 uppercase tracking-widest opacity-80">Correct Form</span>
-                {/* Responsive text size to prevent overflow for longer idioms */}
-                <p className={`${currentCard.correct.length > 4 ? 'text-4xl' : 'text-6xl'} font-bold mt-2 tracking-wide`}>{currentCard.correct}</p>
+
+              {/* Back of Card (CORRECT) */}
+              <div className="absolute w-full h-full backface-hidden bg-red-600 rounded-3xl shadow-xl rotate-y-180 flex flex-col items-center justify-center p-8 text-white">
+                 <div className="absolute top-6 right-6 flex items-center gap-1 text-red-600 bg-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">
+                    <Check className="w-3 h-3" />
+                    <span>Correct</span>
+                </div>
+                 <div className="flex flex-col items-center text-center space-y-6 w-full">
+                  <div>
+                    <span className="text-xs text-red-200 uppercase tracking-widest opacity-80">You saw</span>
+                    <p className="text-2xl font-medium text-red-200 line-through decoration-red-300/50 mt-1">{currentCard.wrong}</p>
+                  </div>
+                  <div className="w-16 h-1 bg-red-400 rounded-full"></div>
+                  <div>
+                    <span className="text-xs text-red-200 uppercase tracking-widest opacity-80">Correct Form</span>
+                    <p className={`${currentCard.correct.length > 4 ? 'text-4xl' : 'text-6xl'} font-bold mt-2 tracking-wide`}>{currentCard.correct}</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-        </div>
-      </div>
+          {/* Controls */}
+          <div className="flex gap-4 mt-8 w-full max-w-md">
+            <button 
+              onClick={(e) => { e.stopPropagation(); handleResponse(false); }}
+              className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 font-bold py-4 px-6 rounded-2xl transition-colors flex flex-col items-center gap-1 border-2 border-red-200 hover:border-red-300 active:scale-95 transform"
+            >
+              <X className="w-6 h-6" />
+              <span className="text-sm">Study Again</span>
+            </button>
 
-      {/* Controls */}
-      <div className="flex gap-4 mt-8 w-full max-w-md">
+            <button 
+              onClick={(e) => { e.stopPropagation(); handleResponse(true); }}
+              className="flex-1 bg-green-100 hover:bg-green-200 text-green-700 font-bold py-4 px-6 rounded-2xl transition-colors flex flex-col items-center gap-1 border-2 border-green-200 hover:border-green-300 active:scale-95 transform"
+            >
+              <Check className="w-6 h-6" />
+              <span className="text-sm">I Know It</span>
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="text-stone-500 mt-20">Loading...</div>
+      )}
+
+      {/* Bottom Navigation */}
+      <div className="fixed bottom-0 left-0 w-full bg-white border-t border-stone-200 p-3 flex justify-center gap-8 z-10">
         <button 
-          onClick={(e) => { e.stopPropagation(); handleResponse(false); }}
-          className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 font-bold py-4 px-6 rounded-2xl transition-colors flex flex-col items-center gap-1 border-2 border-red-200 hover:border-red-300 active:scale-95 transform"
+          onClick={() => setView('flashcards')}
+          className={`flex flex-col items-center gap-1 ${view === 'flashcards' ? 'text-red-600' : 'text-stone-400'}`}
         >
-          <X className="w-6 h-6" />
-          <span className="text-sm">Study Again</span>
+          <Layers className="w-6 h-6" />
+          <span className="text-xs font-medium">Flashcards</span>
         </button>
-
         <button 
-          onClick={(e) => { e.stopPropagation(); handleResponse(true); }}
-          className="flex-1 bg-green-100 hover:bg-green-200 text-green-700 font-bold py-4 px-6 rounded-2xl transition-colors flex flex-col items-center gap-1 border-2 border-green-200 hover:border-green-300 active:scale-95 transform"
+          onClick={() => setView('saved')}
+          className={`flex flex-col items-center gap-1 ${view === 'saved' ? 'text-red-600' : 'text-stone-400'}`}
         >
-          <Check className="w-6 h-6" />
-          <span className="text-sm">I Know It</span>
+          <List className="w-6 h-6" />
+          <span className="text-xs font-medium">Review List</span>
+          {savedList.length > 0 && (
+            <span className="absolute ml-6 mb-4 w-2 h-2 bg-red-500 rounded-full"></span>
+          )}
         </button>
       </div>
 
