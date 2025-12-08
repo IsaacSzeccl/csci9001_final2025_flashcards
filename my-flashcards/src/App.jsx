@@ -96,7 +96,7 @@ const initialVocabulary = [
   { id: 91, wrong: "走頭無路", correct: "走投無路" },
   { id: 92, wrong: "不卑不抗", correct: "不卑不亢" },
   { id: 93, wrong: "怨天由人", correct: "怨天尤人" },
-  { id: 94, wrong: "好高驚遠", correct: "好高騖遠" },
+  { id: 94, wrong: "好高鶩遠", correct: "好高騖遠" },
   { id: 95, wrong: "按步就班", correct: "按部就班" },
   { id: 96, wrong: "矚目驚心", correct: "觸目驚心" },
   { id: 97, wrong: "以逸代勞", correct: "以逸待勞" },
