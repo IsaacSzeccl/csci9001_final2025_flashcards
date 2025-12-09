@@ -31,7 +31,7 @@ const initialVocabulary = [
   { id: 23, type: 'vocab', wrong: "堪察", correct: "勘察" },
   { id: 24, type: 'vocab', wrong: "嚴竣", correct: "嚴峻" }, 
   { id: 25, type: 'vocab', wrong: "完竢", correct: "完竣" },
-  { id: 26, type: 'vocab', wrong: "膺品", correct: "贗品" },
+  { id: 26, type: 'vocab', wrong: "膺品", correct: "贋品" },
   { id: 27, type: 'vocab', wrong: "拆扣", correct: "折扣" },
   { id: 28, type: 'vocab', wrong: "規距", correct: "規矩" },
   { id: 29, type: 'vocab', wrong: "修緝", correct: "修葺" },
